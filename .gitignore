@@ -1,4 +1,4 @@
-# === Python / Backend ===
+# === Python / Backend (abandoned, kept for reference) ===
 backend/.venv/
 backend/__pycache__/
 backend/**/__pycache__/
@@ -8,15 +8,15 @@ backend/.env
 backend/.pytest_cache/
 backend/.mypy_cache/
 
-# === Node / Frontend ===
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/.env.local
-frontend/.env.production.local
-frontend/*.log
-frontend/.tsbuildinfo
-frontend/next-env.d.ts
+# === Node / Next.js (root layout since 2026-07-21) ===
+node_modules/
+.next/
+out/
+.env.local
+.env.production.local
+*.log
+.tsbuildinfo
+next-env.d.ts
 
 # === Local SQLite (root placeholder) ===
 /*.db

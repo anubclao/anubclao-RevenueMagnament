@@ -1,16 +1,36 @@
 {
-  "name": "bora-bora-rm",
+  "name": "bora-bora-rm-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "Hotel Bora Bora Revenue Management — root wrapper for Hostinger deploy. Real app lives in ./frontend.",
   "scripts": {
-    "postinstall": "cd frontend && npm install",
-    "build": "cd frontend && npm run build",
-    "start": "cd frontend && npm start",
-    "dev": "cd frontend && npm run dev",
-    "typecheck": "cd frontend && npm run typecheck"
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
-  "engines": {
-    "node": ">=18.18.0"
+  "dependencies": {
+    "next": "15.1.4",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "swr": "2.3.0",
+    "recharts": "2.15.0",
+    "clsx": "2.1.1",
+    "tailwind-merge": "2.6.0",
+    "lucide-react": "0.469.0",
+    "date-fns": "4.1.0",
+    "mysql2": "3.11.5",
+    "exceljs": "4.4.0"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3",
+    "@types/node": "22.10.5",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "tailwindcss": "3.4.17",
+    "postcss": "8.4.49",
+    "autoprefixer": "10.4.20",
+    "eslint": "9.18.0",
+    "eslint-config-next": "15.1.4"
   }
 }

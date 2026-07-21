@@ -14,24 +14,31 @@
 8. **`App_cors_origins` debe ser string CSV**, no JSON array en el .env.
 9. **StlySale.semana_num llega hasta 120** (semana del año + offset multi-año), no 53. El schema Pydantic debe permitir hasta 200. Si el Excel trae datos históricos con semana > 53, el `model_validate` falla con 500.
 10. **PowerShell `Invoke-WebRequest` muestra mal los acentos** en consola (decodifica como Latin-1). El JSON del backend está correcto en UTF-8; el navegador los renderiza bien. Si ves "Tel�fono" en tests PowerShell, es ruido de la terminal, no bug.
-11. **`ChannelCache.get_id` skipea "Total Alojamiento" devolviendo None** pero la fila IGUAL se inserta en `stly_sales` con `channel_id=NULL`. Eso es correcto (es un subtotal), pero ensucia los joins. Si quieres datos limpios, filtra en el kpi_service con `WHERE channel_id IS NOT NULL`.
+11. **`ChannelCache.get_id` skipea "Total Alojamiento" devolviendo None** pero la fila IGUAL se inserta en `stly_sales` con `channel_id=NULL`. Eso es correcto (es un subtotal), pero ensucia los joins. Si quieres datos limpios, filtra en el KPI service con `WHERE channel_id IS NOT NULL`.
 
 ## Comandos frecuentes
 
-### Backend
+> ⚠️ **Cambio estructural (2026-07-21):** El backend FastAPI/Python fue
+> **abandonado** y migrado a Next.js API Routes dentro del mismo proyecto.
+> Ya no hay carpeta `frontend/`, todo está en la raíz.
+
+### Dev local (un solo server: Next.js fullstack)
 ```bash
-cd backend
-.venv\Scripts\activate
-python -m scripts.seed                       # crea DB + siembra canales
-uvicorn app.main:app --reload --port 8000    # dev server
+# desde la raíz del repo
+npm install
+copy .env.example .env.local  # editar con credenciales DB
+npm run dev                   # http://localhost:3000
 ```
 
-### Frontend
+### Build de producción
 ```bash
-cd frontend
-npm run dev          # localhost:3000
-npm run build        # build de producción
-npm run typecheck    # tsc --noEmit
+npm run build
+npm start
+```
+
+### Typecheck
+```bash
+npm run typecheck
 ```
 
 ## Estructura de datos — resumen
@@ -49,7 +56,7 @@ npm run typecheck    # tsc --noEmit
 ## Decisiones que ya están tomadas (no abrir debate)
 
 - ✅ Moneda: COP
-- ✅ Driver DB: `asyncmy` (no `pymysql` sync)
+- ✅ Driver DB: `mysql2` (no `asyncmy` ni `pymysql`)
 - ✅ ORM: SQLAlchemy 2.0 typed (no 1.x legacy)
 - ✅ Pool DB: `pool_pre_ping=True` (crítico para Hostinger que recicla conexiones)
 - ✅ Charts: Recharts (no Chart.js — Recharts se integra mejor con Tailwind)

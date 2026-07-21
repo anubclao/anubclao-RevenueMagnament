@@ -1,0 +1,30 @@
+# Bora Bora Revenue Manager — Backend (FastAPI + Pandas + SQLAlchemy)
+# Generado: 2026-07-20
+# Python target: 3.11+
+
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20        # Para upload de archivos en /upload-excel
+
+# --- DB ---
+sqlalchemy[asyncio]==2.0.36
+asyncmy==0.2.10                 # Driver MySQL async (recomendado para FastAPI)
+pymysql==1.1.1                  # Fallback sync (instalar aunque no se use async)
+cryptography==44.0.0            # Requerido por asyncmy/PyMySQL para caching_sha2_password
+aiosqlite==0.20.0               # Para dev local sin MySQL
+
+# --- Data processing ---
+pandas==2.2.3
+openpyxl==3.1.5                 # Lectura de .xlsx (no .xls)
+
+# --- Config / logging ---
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+loguru==0.7.3
+
+# --- Dev / test ---
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1                   # Para TestClient async

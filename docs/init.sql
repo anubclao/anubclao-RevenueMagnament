@@ -2,6 +2,13 @@
 -- BORA BORA — Inicialización de esquema MySQL
 -- Ejecutar en: Hostinger hPanel → Bases de datos MySQL → phpMyAdmin → SQL
 -- Charset obligatorio: utf8mb4 (NO latin1, los tildes se rompen)
+--
+-- NOTA: Este schema NO incluye FOREIGN KEYS a propósito.
+--   Razón: mysqldump genera el dump en orden arbitrario y phpMyAdmin
+--   en Hostinger reactiva FOREIGN_KEY_CHECKS entre sentencias, lo que
+--   produce error 150 (FK incorrectly formed) al importar el seed.
+--   Como esto es un data warehouse de solo lectura y los JOINs van
+--   explícitos en SQL, los FKs no aportan valor y rompen el deploy.
 -- ===========================================================================
 
 CREATE DATABASE IF NOT EXISTS bora_bora_rm
@@ -73,10 +80,8 @@ CREATE TABLE IF NOT EXISTS stly_sales (
   PRIMARY KEY (id),
   UNIQUE KEY uk_stly_nat (fecha_semana, anio_mes, mes, channel_id),
   KEY idx_stly_fecha (fecha_semana),
-  KEY idx_stly_anio_mes_canal (anio_mes, mes, channel_id),
-  CONSTRAINT fk_stly_channel
-    FOREIGN KEY (channel_id) REFERENCES channels(id)
-    ON DELETE SET NULL ON UPDATE CASCADE
+  KEY idx_stly_anio_mes_canal (anio_mes, mes, channel_id)
+  -- FK removido a propósito (ver nota al inicio del archivo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
@@ -96,10 +101,8 @@ CREATE TABLE IF NOT EXISTS channel_sales_month (
                   ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_csm_nat (anio, mes, channel_id),
-  KEY idx_csm_anio_mes (anio, mes),
-  CONSTRAINT fk_csm_channel
-    FOREIGN KEY (channel_id) REFERENCES channels(id)
-    ON DELETE RESTRICT ON UPDATE CASCADE
+  KEY idx_csm_anio_mes (anio, mes)
+  -- FK removido a propósito (ver nota al inicio del archivo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------

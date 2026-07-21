@@ -1,0 +1,16 @@
+{
+  "name": "bora-bora-rm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hotel Bora Bora Revenue Management — root wrapper for Hostinger deploy. Real app lives in ./frontend.",
+  "scripts": {
+    "postinstall": "cd frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm start",
+    "dev": "cd frontend && npm run dev",
+    "typecheck": "cd frontend && npm run typecheck"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}

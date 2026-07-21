@@ -4,25 +4,20 @@
 
 ## Lo más importante primero
 
-1. **Moneda es COP, no USD.** Ver `docs/decisions.md` §1. El símbolo `$` en el Excel es peso colombiano.
-2. **Hostinger NO soporta Python en planes Node.js.** Ver `docs/decisions.md` §2. El código actual es FastAPI pero el plan A real es migrar a Next.js API Routes.
-3. **Catálogo de canales en tabla `channels`.** No insertar canales en `stly_sales` o `channel_sales_month` con string libre. Usar `channels.get_id(name)` en el processor.
-4. **Sanitización de NaN/None en el processor.** Ver `_to_decimal`, `_to_int`, `_to_date` en `backend/app/services/excel_processor.py`. NUNCA pasar `np.nan` o `pd.NaT` al JSON response.
-5. **Filtros en URL, no en estado global.** El componente `useFilters` ya sincroniza con `useSearchParams`. No agregar Context ni Redux.
-6. **SQLite NO auto-incrementa `BIGINT PRIMARY KEY`** — solo `INTEGER PRIMARY KEY`. Usar `Integer` para todos los PKs. (Verificado el 2026-07-20.)
-7. **Pydantic v2 con listas en `.env`:** declarar el campo como `str` y convertir en property. Si se declara como `List[str]`, Pydantic intenta parsearlo como JSON y falla.
-8. **`App_cors_origins` debe ser string CSV**, no JSON array en el .env.
-9. **StlySale.semana_num llega hasta 120** (semana del año + offset multi-año), no 53. El schema Pydantic debe permitir hasta 200. Si el Excel trae datos históricos con semana > 53, el `model_validate` falla con 500.
-10. **PowerShell `Invoke-WebRequest` muestra mal los acentos** en consola (decodifica como Latin-1). El JSON del backend está correcto en UTF-8; el navegador los renderiza bien. Si ves "Tel�fono" en tests PowerShell, es ruido de la terminal, no bug.
-11. **`ChannelCache.get_id` skipea "Total Alojamiento" devolviendo None** pero la fila IGUAL se inserta en `stly_sales` con `channel_id=NULL`. Eso es correcto (es un subtotal), pero ensucia los joins. Si quieres datos limpios, filtra en el KPI service con `WHERE channel_id IS NOT NULL`.
+1. **Moneda es COP, no USD.** El símbolo `$` en el Excel es peso colombiano.
+2. **Stack actual: Next.js 15 fullstack (App Router + API Routes)**. NO hay backend Python/FastAPI. NO hay carpeta `frontend/`. Todo está en la raíz.
+3. **Catálogo de canales en tabla `channels`.** No insertar canales en `stly_sales` o `channel_sales_month` con string libre. Usar el `ChannelMap` case-insensitive en la API route.
+4. **Charset MySQL `utf8mb4` SIEMPRE.** Al importar seeds, usar `mysql --default-character-set=utf8mb4` y `mysqldump --default-character-set=utf8mb4`. Si no, los tildes se rompen (`Tel├®fono`).
+5. **mysqldump + Hostinger phpMyAdmin no se llevan bien.** Quitar TODO el bloque de save/restore (`@OLD_*` / `character_set_client` / `TIME_ZONE`) en el seed antes de importar — phpMyAdmin parte el dump en batches y pierde las variables de sesión.
+6. **Sin FOREIGN KEYS en el schema.** Es un data warehouse de solo lectura, los JOINs van explícitos en SQL. Los FKs no aportan y rompen los imports en phpMyAdmin.
+7. **Filtros en URL, no en estado global.** El hook `useFilters` ya sincroniza con `useSearchParams`. No agregar Context ni Redux.
+8. **Currency formatting sin redondeo:** `formatCOP(v)` retorna el valor completo con `Intl.NumberFormat('es-CO')`. NUNCA aplicar `.toFixed(0)` a dinero.
+9. **Decimal en backend:** `Numeric(15,2)` para dinero, `Numeric(6,2)` para %, `Numeric(12,2)` para ADR. En el JSON se serializan como STRING, el frontend convierte con `Number()` cuando lo necesita.
+10. **Hostinger Node.js NO recarga env vars con Restart.** Necesita **Redeploy completo** (botón "Guardar y reimplementar" morado) para que el nuevo proceso lea las env vars del panel.
 
 ## Comandos frecuentes
 
-> ⚠️ **Cambio estructural (2026-07-21):** El backend FastAPI/Python fue
-> **abandonado** y migrado a Next.js API Routes dentro del mismo proyecto.
-> Ya no hay carpeta `frontend/`, todo está en la raíz.
-
-### Dev local (un solo server: Next.js fullstack)
+### Dev local
 ```bash
 # desde la raíz del repo
 npm install
@@ -41,63 +36,120 @@ npm start
 npm run typecheck
 ```
 
-## Estructura de datos — resumen
+## Estructura del proyecto (post-flatten)
 
-| Tabla | Origen Excel | Filas aprox | Carga |
+```
+RevenueManager/
+├── app/                        # Next.js App Router
+│   ├── page.tsx, layout.tsx
+│   ├── dashboard/              # /dashboard + componentes
+│   ├── api/                    # API Routes (/api/dashboard/charts, etc.)
+│   ├── stly/, channels-sales/, predictions/, pickup/, upload/
+├── lib/                        # Server-side utilities
+│   ├── api.ts                  # fetch wrapper para SWR (relative URLs)
+│   ├── db.ts                   # mysql2 pool singleton
+│   ├── filters.ts              # KPI service (3-layer source logic)
+│   ├── format.ts               # formatCOP, formatOCC, formatPercent
+│   ├── useFilters.ts           # URL search params hook (client)
+│   ├── excel.ts                # exceljs parser
+│   ├── predictions.ts          # Predicciones derivadas
+│   └── types.ts                # TypeScript types
+├── components/                 # (reserved for shared components)
+├── docs/
+│   ├── init.sql                # DDL (sin FKs)
+│   ├── seed_data.sql           # mysqldump post-procesado
+│   ├── DEPLOY_HOSTINGER.md     # Pasos de deploy
+│   └── decisions.md            # Decisiones históricas del proyecto
+├── package.json                # Next.js fullstack en la raíz
+├── tsconfig.json               # path alias @/* → ./*
+├── .env.example
+├── .env.local                  # (gitignored) DB_PASS, etc.
+└── backend/                    # FastAPI abandonado, NO se deploya
+```
+
+## Estructura de DB — resumen
+
+| Tabla | Origen Excel | Filas | Carga |
 |---|---|---|---|
-| `pickup_weekly` | DB_PU_WEEK | 325 | Semanal (UPSERT) |
-| `stly_sales` | STLY | 30,368 | Trimestral (bulk insert) |
-| `channel_sales_month` | Venta por canal | 315 | Mensual (UPSERT) |
-| `predictions` | Predicciones | 52 | Anual (form manual) |
-| `recommendations` | Recomendaciones | 34 | Ad-hoc (CRUD) |
+| `pickup_weekly` | DB_PU_WEEK | 300 | Semanal (UPSERT) |
+| `stly_sales` | STLY | 27,482 | Trimestral (bulk insert) |
+| `channel_sales_month` | Venta por canal | 311 | Mensual (UPSERT) |
+| `dashboard_monthly` | TENDENCIA MENSUAL | 48 | Anual (source of truth para KPIs) |
+| `predictions` | (derivado) | 0 | Anual (derivado algorítmico) |
+| `recommendations` | (manual) | 0 | Ad-hoc (CRUD) |
 | `channels` | (catálogo) | 25 | Seed inicial |
-| `ingest_log` | (auditoría) | N | Append-only |
+| `ingest_log` | (auditoría) | 17 | Append-only |
 
-## Decisiones que ya están tomadas (no abrir debate)
+## Decisiones tomadas (no abrir debate)
 
 - ✅ Moneda: COP
-- ✅ Driver DB: `mysql2` (no `asyncmy` ni `pymysql`)
-- ✅ ORM: SQLAlchemy 2.0 typed (no 1.x legacy)
+- ✅ Driver DB: `mysql2/promise` (no `asyncmy`, no `asyncpg`)
+- ✅ ORM: SQLAlchemy 2.0 typed
 - ✅ Pool DB: `pool_pre_ping=True` (crítico para Hostinger que recicla conexiones)
-- ✅ Charts: Recharts (no Chart.js — Recharts se integra mejor con Tailwind)
-- ✅ Data fetching: SWR (no react-query — menos KB y mismo API para este caso)
+- ✅ Charts: Recharts (no Chart.js)
+- ✅ Data fetching: SWR (no react-query)
 - ✅ Routing: App Router de Next 15
 - ✅ TypeScript strict: true
-- ✅ Decimal en backend: `Numeric(15,2)` para dinero, `Numeric(6,2)` para %, `Numeric(12,2)` para ADR
-- ✅ Float en frontend: `number` — la conversión se hace en el formatter con `Intl.NumberFormat`
+- ✅ Charts con `isAnimationActive={false}` (bug de Recharts con líneas invisibles)
+- ✅ Adaptive charts (pickup charts muestran comparativa interanual cuando no hay pickup del año)
+- ✅ `dashboard_monthly` es source of truth para KPIs (no `pickup_weekly` ni `stly_sales`)
+- ✅ Single date filter para `fecha_reporte` (no range)
+- ✅ Predicciones derivadas algorítmicamente (no del Excel)
+- ✅ Sin FOREIGN KEYS
+- ✅ ChannelMap case-insensitive + alias para typos del Excel
 
 ## Convenciones
 
-- **Snake_case en DB y Python**, **camelCase en TypeScript**.
+- **snake_case en DB**, **camelCase en TypeScript**.
 - **Endpoints REST en kebab-case** (`/api/dashboard/metrics`).
 - **Filtros siempre como query params**, nunca en body.
 - **Fechas siempre ISO 8601** (`YYYY-MM-DD`).
-- **Errores como `{ "detail": "..." }`** (formato de FastAPI).
-- **Una sola responsabilidad por archivo** en `services/`.
+- **Errores como `{ "ok": false, "error": "..." }`** (formato Next.js API Routes).
+- **URLs relativas** en el frontend (`/api/...`).
+- **Sin `NEXT_PUBLIC_API_BASE_URL`** en prod (Hostinger sirve el mismo dominio).
 
-## Tests pendientes (TODO)
+## Deploy a Hostinger
 
-- [ ] `backend/tests/test_excel_processor.py` — fixture con un .xlsx pequeño
-- [ ] `backend/tests/test_kpi_service.py` — fixtures de DB en SQLite
-- [ ] `frontend/__tests__/DashboardClient.test.tsx` — mock SWR
-- [ ] `frontend/e2e/upload.spec.ts` — Playwright
+Resumen de los pasos clave (ver `docs/DEPLOY_HOSTINGER.md` para el detalle):
 
-## Estado actual (verificado 2026-07-20)
-
-✅ **Backend completo** — 12 archivos Python, syntax OK, server corriendo en :8000
-✅ **Frontend completo** — 19 archivos TS/TSX, typecheck OK, server corriendo en :3000
-✅ **Excel cargado** — 31,001 filas en DB (325 DB_PU_WEEK + 30,368 STLY + 308 Venta por canal)
-✅ **End-to-end verificado** — Dashboard en :3000 muestra datos reales del Excel
-✅ **KPI cards renderizan** — $24.36B ingresos, $1.279.237 ADR, 33,57% occ, 19.039 RN
-✅ **Donut chart funcional** — Booking.com 56.6%, Sitio web 18.7%, etc.
-✅ **Screenshot en `screenshots/dashboard_full.png`** — prueba visual de funcionamiento
+1. **Subir código a GitHub** (rama `main` del repo `anubclao/anubclao-RevenueMagnament`)
+2. **En hPanel → Advanced → Node.js**, configurar la app con Node 22.x, Entry: `npm start`
+3. **Variables de entorno** en el panel:
+   - `DB_HOST=srv1234.hstgr.io`
+   - `DB_PORT=3306`
+   - `DB_USER=u652436213_admin`
+   - `DB_PASS=Anubclao2026`
+   - `DB_NAME=u652436213_revenuemg`
+   - `NODE_ENV=production`
+4. **Importar el seed** vía phpMyAdmin: `docs/seed_data.sql` (3.6 MB, post-procesado)
+5. **Redeploy** después de cambiar env vars (botón "Guardar y reimplementar" morado)
+6. **Verificar**: `GET /api/health` debe responder `{"ok":true,"db":true}`
 
 ## Archivos críticos que NO romper
 
-- `backend/app/services/excel_processor.py` — la lógica de UPSERT y sanitización
-- `backend/app/services/kpi_service.py` — el cálculo de variación anual (mismo mes año anterior)
-- `backend/app/models.py` — los modelos SQLAlchemy (Integer PK por SQLite)
-- `backend/app/config.py` — Pydantic settings con CORS como string CSV
-- `frontend/lib/useFilters.ts` — el hook de filtros/URL
-- `frontend/lib/format.ts` — los formatters de COP
-- `docs/init.sql` — el DDL que se ejecuta en Hostinger hPanel
+- `lib/db.ts` — el pool MySQL con charset utf8mb4 y keep-alive
+- `lib/filters.ts` — el KPI service con lógica 3-layer (pickup_weekly + dashboard_monthly + stly_sales)
+- `lib/excel.ts` — el parser exceljs (auto-detecta formato del header)
+- `lib/useFilters.ts` — el hook de filtros/URL (úsalo, no reinventes)
+- `lib/format.ts` — los formatters de COP (nunca redondees)
+- `app/api/*/route.ts` — cada endpoint debe usar `pool.query()` directamente, no `query()` helper que retorna T[]
+- `app/dashboard/page.tsx` — orquesta los 4 charts y los filtros
+- `docs/seed_data.sql` — si regeneras, hazlo con `mysqldump --default-character-set=utf8mb4 --skip-set-charset` y luego quita TODAS las líneas `/*!SET @OLD_*` y `/*!SET character_set_client` con el post-procesado documentado
+- `docs/init.sql` — el DDL sin FKs que se ejecuta en Hostinger hPanel
+
+## Estado actual (verificado 2026-07-21)
+
+✅ **Single Next.js app** (frontend + API routes) en raíz
+✅ **Build local OK** (`npm run build` pasa, 12 API routes + 6 pages)
+✅ **Typecheck local OK** (`tsc --noEmit` pasa)
+✅ **DB local con datos:** 25 channels, 300 pickup, 27,482 stly, 311 csm, 48 dashboard_monthly
+✅ **Deploy a Hostinger** (`anubclao-RevenueMagnament`, rama main)
+✅ **App arranca** en Hostinger (Ready in 90ms)
+⚠️ **Pendiente:** env vars no se leen (necesita redeploy completo) + el último deploy falló por build cache corrupto, se limpia con un nuevo commit
+
+## TODO
+
+- [ ] E2E tests con Playwright
+- [ ] Tabla `predictions` poblada con datos derivados
+- [ ] CRUD UI para `recommendations` (hoy es solo API)
+- [ ] Login/auth (ahora la app es pública)

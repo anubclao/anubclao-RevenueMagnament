@@ -137,15 +137,19 @@ Resumen de los pasos clave (ver `docs/DEPLOY_HOSTINGER.md` para el detalle):
 - `docs/seed_data.sql` — si regeneras, hazlo con `mysqldump --default-character-set=utf8mb4 --skip-set-charset` y luego quita TODAS las líneas `/*!SET @OLD_*` y `/*!SET character_set_client` con el post-procesado documentado
 - `docs/init.sql` — el DDL sin FKs que se ejecuta en Hostinger hPanel
 
-## Estado actual (verificado 2026-07-21)
+## Estado actual (verificado 2026-07-22)
 
 ✅ **Single Next.js app** (frontend + API routes) en raíz
 ✅ **Build local OK** (`npm run build` pasa, 12 API routes + 6 pages)
 ✅ **Typecheck local OK** (`tsc --noEmit` pasa)
 ✅ **DB local con datos:** 25 channels, 300 pickup, 27,482 stly, 311 csm, 48 dashboard_monthly
-✅ **Deploy a Hostinger** (`anubclao-RevenueMagnament`, rama main)
-✅ **App arranca** en Hostinger (Ready in 90ms)
-⚠️ **Pendiente:** env vars no se leen (necesita redeploy completo) + el último deploy falló por build cache corrupto, se limpia con un nuevo commit
+✅ **SQL listo para Hostinger:** `docs/init.sql` + `docs/seed_data.sql` (3.4 MB), DB-agnósticos
+   - 8 tablas (channels, pickup_weekly, stly_sales, channel_sales_month, dashboard_monthly, predictions, recommendations, ingest_log)
+   - Charset utf8mb4, sin FKs, sin CREATE DATABASE/USE (phpMyAdmin selecciona la DB)
+✅ **Push a GitHub:** commit `51516bb` con SQL DB-agnóstico
+✅ **App web deployada:** home page sirve HTML, `/api/health` responde `runtime: nextjs-api-route` (versión vieja todavía, antes del fix)
+⚠️ **Bloqueado en deploy:** la app actual en hPanel tiene build cache corrupto (3+ builds fallan con el mismo webpack "Module not found '@/lib/...'"). Fix definitivo: **borrar y recrear la app en hPanel** (5 min) cuando el user decida retomar el deploy.
+📌 **Credenciales Hostinger DB (de hPanel):** DB_HOST=srv1234.hstgr.io, DB_USER=u123456_revenue, DB_NAME=u123456_revenuemg, DB_PASS=Anubclao2026, DB_PORT=3306, NODE_ENV=production
 
 ## TODO
 

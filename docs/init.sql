@@ -3,6 +3,15 @@
 -- Ejecutar en: Hostinger hPanel → Bases de datos MySQL → phpMyAdmin → SQL
 -- Charset obligatorio: utf8mb4 (NO latin1, los tildes se rompen)
 --
+-- INSTRUCCIONES DE IMPORT:
+--   1. En phpMyAdmin, selecciona tu base de datos (ej. u123456_revenuemg) del
+--      panel izquierdo ANTES de importar.
+--   2. Este script NO crea la base de datos — usa la que ya tienes asignada
+--      en Hostinger hPanel. La creación de DBs vía SQL está bloqueada en
+--      planes compartidos.
+--   3. Click en "Importar" y selecciona este archivo.
+--   4. Charset: utf8mb4.
+--
 -- NOTA: Este schema NO incluye FOREIGN KEYS a propósito.
 --   Razón: mysqldump genera el dump en orden arbitrario y phpMyAdmin
 --   en Hostinger reactiva FOREIGN_KEY_CHECKS entre sentencias, lo que
@@ -10,12 +19,8 @@
 --   Como esto es un data warehouse de solo lectura y los JOINs van
 --   explícitos en SQL, los FKs no aportan valor y rompen el deploy.
 -- ===========================================================================
-
-CREATE DATABASE IF NOT EXISTS bora_bora_rm
-  DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_unicode_ci;
 
-USE bora_bora_rm;
 
 -- ----------------------------------------------------------------------------
 -- 1. channels — catálogo normalizado de canales

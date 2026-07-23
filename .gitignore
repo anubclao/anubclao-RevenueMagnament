@@ -40,3 +40,7 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+
+tsconfig.tsbuildinfo
+
+tests/verifiers/TEMPLATE_*.spec.ts

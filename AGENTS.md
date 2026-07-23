@@ -2,6 +2,21 @@
 
 > Contexto para agentes AI (Claude/Cursor/MiniMax Code/etc) que trabajen en este proyecto.
 
+## ⚠️ Workflow OBLIGATORIO: Karpathy Spec → Verifier → Implementation
+
+Este proyecto usa la metodología **Karpathy** (Spec + Verifier + Environment). Lee `/docs/env/ARCHITECTURE.md` y `/docs/env/CONSTRAINTS.md` PRIMERO. Cero código antes de tener spec aprobado y verifier en rojo.
+
+**Fases estrictas:**
+1. **Environment** — leer `docs/env/ARCHITECTURE.md` + `docs/env/CONSTRAINTS.md`, confirmar entendimiento en 2-3 oraciones.
+2. **Spec** — crear `docs/specs/[feature].md` usando el template `docs/specs/TEMPLATE_feature-spec.md`. Pedir aprobación.
+3. **Verifier** — escribir `tests/verifiers/[feature].spec.ts`. Correr, confirmar que fallan (RED).
+4. **Implementation** — escribir código para hacer pasar los tests (GREEN).
+5. **Refactor** — pasar los tests una vez más, limpiar.
+
+Anti-patterns prohibidos: código antes de spec, modificar tests para que pasen, agregar features fuera del spec, `any` en TS.
+
+---
+
 ## Lo más importante primero
 
 1. **Moneda es COP, no USD.** El símbolo `$` en el Excel es peso colombiano.
@@ -14,6 +29,10 @@
 8. **Currency formatting sin redondeo:** `formatCOP(v)` retorna el valor completo con `Intl.NumberFormat('es-CO')`. NUNCA aplicar `.toFixed(0)` a dinero.
 9. **Decimal en backend:** `Numeric(15,2)` para dinero, `Numeric(6,2)` para %, `Numeric(12,2)` para ADR. En el JSON se serializan como STRING, el frontend convierte con `Number()` cuando lo necesita.
 10. **Hostinger Node.js NO recarga env vars con Restart.** Necesita **Redeploy completo** (botón "Guardar y reimplementar" morado) para que el nuevo proceso lea las env vars del panel.
+
+## ⚠️ REGLA DE ORO: cifras reales, no inventadas
+
+App de análisis de datos. **Prohibido** inventar valores, promediar cuando no hay datos, mezclar años. Si no hay datos, la UI dice "sin datos" — nunca muestra números arbitrarios.
 
 ## Comandos frecuentes
 
@@ -36,6 +55,11 @@ npm start
 npm run typecheck
 ```
 
+### Auditoría de datos
+```bash
+node scripts/audit-data-integrity.mjs   # Excel vs MySQL
+```
+
 ## Estructura del proyecto (post-flatten)
 
 ```
@@ -43,7 +67,7 @@ RevenueManager/
 ├── app/                        # Next.js App Router
 │   ├── page.tsx, layout.tsx
 │   ├── dashboard/              # /dashboard + componentes
-│   ├── api/                    # API Routes (/api/dashboard/charts, etc.)
+│   ├── api/                    # API Routes
 │   ├── stly/, channels-sales/, predictions/, pickup/, upload/
 ├── lib/                        # Server-side utilities
 │   ├── api.ts                  # fetch wrapper para SWR (relative URLs)
@@ -53,18 +77,22 @@ RevenueManager/
 │   ├── useFilters.ts           # URL search params hook (client)
 │   ├── excel.ts                # exceljs parser
 │   ├── predictions.ts          # Predicciones derivadas
-│   └── types.ts                # TypeScript types
+│   └── types.ts
 ├── components/                 # (reserved for shared components)
 ├── docs/
+│   ├── env/                    # ← Karpathy: arquitectura + constraints
+│   ├── specs/                  # ← Karpathy: specs de features
 │   ├── init.sql                # DDL (sin FKs)
 │   ├── seed_data.sql           # mysqldump post-procesado
 │   ├── DEPLOY_HOSTINGER.md     # Pasos de deploy
 │   └── decisions.md            # Decisiones históricas del proyecto
+├── scripts/                    # ← Scripts de auditoría / utilidad
+├── tests/verifiers/            # ← Karpathy: TDD tests
 ├── package.json                # Next.js fullstack en la raíz
 ├── tsconfig.json               # path alias @/* → ./*
 ├── .env.example
 ├── .env.local                  # (gitignored) DB_PASS, etc.
-└── backend/                    # FastAPI abandonado, NO se deploya
+└── backend/                    # FastAPI abandonado, gitignored
 ```
 
 ## Estructura de DB — resumen
@@ -83,20 +111,21 @@ RevenueManager/
 ## Decisiones tomadas (no abrir debate)
 
 - ✅ Moneda: COP
-- ✅ Driver DB: `mysql2/promise` (no `asyncmy`, no `asyncpg`)
-- ✅ ORM: SQLAlchemy 2.0 typed
-- ✅ Pool DB: `pool_pre_ping=True` (crítico para Hostinger que recicla conexiones)
-- ✅ Charts: Recharts (no Chart.js)
-- ✅ Data fetching: SWR (no react-query)
+- ✅ Driver DB: `mysql2/promise`
+- ✅ ORM: SQL crudo con `pool.query()` directo
+- ✅ Pool DB: `pool_pre_ping=True`
+- ✅ Charts: Recharts
+- ✅ Data fetching: SWR
 - ✅ Routing: App Router de Next 15
 - ✅ TypeScript strict: true
-- ✅ Charts con `isAnimationActive={false}` (bug de Recharts con líneas invisibles)
+- ✅ Charts con `isAnimationActive={false}`
 - ✅ Adaptive charts (pickup charts muestran comparativa interanual cuando no hay pickup del año)
-- ✅ `dashboard_monthly` es source of truth para KPIs (no `pickup_weekly` ni `stly_sales`)
-- ✅ Single date filter para `fecha_reporte` (no range)
-- ✅ Predicciones derivadas algorítmicamente (no del Excel)
+- ✅ `dashboard_monthly` es source of truth para KPIs
+- ✅ Single date filter para `fecha_reporte`
+- ✅ Predicciones derivadas algorítmicamente
 - ✅ Sin FOREIGN KEYS
 - ✅ ChannelMap case-insensitive + alias para typos del Excel
+- ✅ **Metodología Karpathy** (Spec → Verifier → Implementation) para TODO trabajo nuevo
 
 ## Convenciones
 
@@ -104,56 +133,48 @@ RevenueManager/
 - **Endpoints REST en kebab-case** (`/api/dashboard/metrics`).
 - **Filtros siempre como query params**, nunca en body.
 - **Fechas siempre ISO 8601** (`YYYY-MM-DD`).
-- **Errores como `{ "ok": false, "error": "..." }`** (formato Next.js API Routes).
+- **Errores como `{ "ok": false, "error": "..." }`**.
 - **URLs relativas** en el frontend (`/api/...`).
-- **Sin `NEXT_PUBLIC_API_BASE_URL`** en prod (Hostinger sirve el mismo dominio).
+- **Sin `NEXT_PUBLIC_API_BASE_URL`** en prod.
 
 ## Deploy a Hostinger
 
-Resumen de los pasos clave (ver `docs/DEPLOY_HOSTINGER.md` para el detalle):
+Resumen (ver `docs/DEPLOY_HOSTINGER.md` para detalle):
 
-1. **Subir código a GitHub** (rama `main` del repo `anubclao/anubclao-RevenueMagnament`)
-2. **En hPanel → Advanced → Node.js**, configurar la app con Node 22.x, Entry: `npm start`
-3. **Variables de entorno** en el panel:
-   - `DB_HOST=srv1234.hstgr.io`
-   - `DB_PORT=3306`
-   - `DB_USER=u652436213_admin`
-   - `DB_PASS=Anubclao2026`
-   - `DB_NAME=u652436213_revenuemg`
-   - `NODE_ENV=production`
-4. **Importar el seed** vía phpMyAdmin: `docs/seed_data.sql` (3.6 MB, post-procesado)
-5. **Redeploy** después de cambiar env vars (botón "Guardar y reimplementar" morado)
-6. **Verificar**: `GET /api/health` debe responder `{"ok":true,"db":true}`
+1. **Push a GitHub** → `anubclao/anubclao-RevenueMagnament` (rama main)
+2. **hPanel → Advanced → Node.js** → Node 22.x, Entry: `npm start`
+3. **Env vars**: DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME, NODE_ENV
+4. **Importar seed** vía phpMyAdmin: `docs/init.sql` + `docs/seed_data.sql` (3.4 MB, DB-agnósticos)
+5. **Re-deploy** después de cambiar env vars (botón morado)
+6. **Verificar**: `GET /api/health` → `{"db_ok":true,"env_all_set":true}`
 
 ## Archivos críticos que NO romper
 
-- `lib/db.ts` — el pool MySQL con charset utf8mb4 y keep-alive
-- `lib/filters.ts` — el KPI service con lógica 3-layer (pickup_weekly + dashboard_monthly + stly_sales)
-- `lib/excel.ts` — el parser exceljs (auto-detecta formato del header)
-- `lib/useFilters.ts` — el hook de filtros/URL (úsalo, no reinventes)
-- `lib/format.ts` — los formatters de COP (nunca redondees)
-- `app/api/*/route.ts` — cada endpoint debe usar `pool.query()` directamente, no `query()` helper que retorna T[]
-- `app/dashboard/page.tsx` — orquesta los 4 charts y los filtros
-- `docs/seed_data.sql` — si regeneras, hazlo con `mysqldump --default-character-set=utf8mb4 --skip-set-charset` y luego quita TODAS las líneas `/*!SET @OLD_*` y `/*!SET character_set_client` con el post-procesado documentado
-- `docs/init.sql` — el DDL sin FKs que se ejecuta en Hostinger hPanel
+- `lib/db.ts` — pool MySQL utf8mb4 keep-alive
+- `lib/filters.ts` — KPI service 3-layer
+- `lib/excel.ts` — parser exceljs auto-detect
+- `lib/useFilters.ts` — hook URL search params
+- `lib/format.ts` — formatters COP sin redondeo
+- `app/api/*/route.ts` — `pool.query()` directo
+- `app/dashboard/page.tsx` — orquesta charts y filtros
+- `docs/seed_data.sql` — si regeneras, post-procesar `@OLD_*` y `character_set_client`
+- `docs/init.sql` — DDL sin FKs
 
 ## Estado actual (verificado 2026-07-22)
 
-✅ **Single Next.js app** (frontend + API routes) en raíz
-✅ **Build local OK** (`npm run build` pasa, 12 API routes + 6 pages)
-✅ **Typecheck local OK** (`tsc --noEmit` pasa)
-✅ **DB local con datos:** 25 channels, 300 pickup, 27,482 stly, 311 csm, 48 dashboard_monthly
-✅ **SQL listo para Hostinger:** `docs/init.sql` + `docs/seed_data.sql` (3.4 MB), DB-agnósticos
-   - 8 tablas (channels, pickup_weekly, stly_sales, channel_sales_month, dashboard_monthly, predictions, recommendations, ingest_log)
-   - Charset utf8mb4, sin FKs, sin CREATE DATABASE/USE (phpMyAdmin selecciona la DB)
-✅ **Push a GitHub:** commit `51516bb` con SQL DB-agnóstico
-✅ **App web deployada:** home page sirve HTML, `/api/health` responde `runtime: nextjs-api-route` (versión vieja todavía, antes del fix)
-⚠️ **Bloqueado en deploy:** la app actual en hPanel tiene build cache corrupto (3+ builds fallan con el mismo webpack "Module not found '@/lib/...'"). Fix definitivo: **borrar y recrear la app en hPanel** (5 min) cuando el user decida retomar el deploy.
-📌 **Credenciales Hostinger DB (de hPanel):** DB_HOST=srv1234.hstgr.io, DB_USER=u123456_revenue, DB_NAME=u123456_revenuemg, DB_PASS=Anubclao2026, DB_PORT=3306, NODE_ENV=production
+✅ Single Next.js app, build local OK, typecheck OK
+✅ DB local con datos: 25 channels, 300 pickup, 27,482 stly, 311 csm, 48 dashboard_monthly
+✅ SQL listo para Hostinger (init.sql + seed_data.sql, DB-agnósticos, 3.4 MB)
+✅ Push a GitHub (commit `f11f574`)
+⚠️ **Bloqueado en deploy**: build cache corrupto en hPanel — fix nuclear = borrar y recrear app (5 min)
+📌 Credenciales Hostinger: srv1234.hstgr.io, u123456_revenue / u123456_revenuemg, Anubclao2026
 
 ## TODO
 
+- [x] ~~Auditoría de integridad de datos~~ → `docs/specs/data-integrity-audit.md` (en progreso)
 - [ ] E2E tests con Playwright
 - [ ] Tabla `predictions` poblada con datos derivados
-- [ ] CRUD UI para `recommendations` (hoy es solo API)
+- [ ] CRUD UI para `recommendations`
 - [ ] Login/auth (ahora la app es pública)
+- [ ] Multi-tenant: 3 hoteles más como módulos
+- [ ] Superadmin + auth per-hotel
